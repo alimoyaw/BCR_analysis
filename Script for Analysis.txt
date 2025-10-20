@@ -1,0 +1,67 @@
+####################### BEFORE IMGT ########################################
+
+1. cutadapt
+cutadapt -a TCGTCGGCAGCGTCAGATGTGTATAAGA -g GTCTCGTGGGCTCGGAGATGTGTATAAGA --action trim  EA32-84_S8_L001_R2_001.fastq -o EA32-84_S8_L001_R2.fastq
+
+
+2. MaskPrimers
+
+arr=( $(ls *.fastq) )
+for i in ${arr[@]};do
+MaskPrimers.py align -s $i --outdir MaskPrimers -p IgZ.fasta --maxerror 0.2 --maxlen 30 --revpr --mode cut
+
+done
+
+3. PairSeq
+PairSeq.py -1 $(ls *_R2_*) -2 $(ls *_R1_*) --outdir Pairseq --coord illumina
+
+4. Assembly
+AssemblePairs.py align -1 $(ls *_R2_*) -2 $(ls *_R1_*) --outdir Assemble --coord illumina
+
+
+5. Filter by Phred score
+
+for i in $(ls *.fastq);do
+FilterSeq.py quality -s $i --outdir Quality_Pass -q 30
+
+done
+
+6. Filter by length
+
+for i in $(ls *.fastq); do
+FilterSeq.py length -s $i --outdir Filter_length -n 100 
+
+done
+
+7. CollapseSeq
+
+for i in $(ls *.fastq); do
+CollapseSeq.py -s $i -n 20 --inner --uf CPRIMER --cf VPRIMER --act set
+
+done
+
+8. SplitSeq
+
+for i in $(ls *.fastq); do
+SplitSeq.py group -s $i -f DUPCOUNT --num 2 --outdir SplitSeq
+
+done
+
+
+
+
+############################ AFTER IMGT ####################################
+
+1. Clonal clustering
+
+ DefineClones.py -d EA33-84_parse-select.tsv --act set --model ham --outdir Clones --norm len --dist 1.2
+
+2. Recreating Germline
+
+CreateGermlines.py -d $i -g dmask --cloned -r IGHV.fasta IGHD.fasta IGHJ.fasta --outdir Germ
+
+3. Tree Building
+
+BuildTrees.py -d EA32-83_parse-select_clone-pass_germ-pass.tsv --outdir EA32-83_tree --outname clone_155 --collapse --igphyml --ncdr3 --clone 155 --clean all --nproc 50
+
+
